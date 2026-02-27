@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Panel de gestión de turnos para peluquería. Administra citas, disponibilidad y clientes.">
+  <title>Peluquería — Panel de Turnos</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-icon">✂️</div>
+      <h1 class="brand-name">Peluquería</h1>
+      <span class="brand-sub">Panel de Turnos</span>
+    </div>
+    <nav class="sidebar-nav">
+      <button class="nav-btn active" data-view="dashboard" id="nav-dashboard">
+        <span class="nav-icon">📊</span> Dashboard
+      </button>
+      <button class="nav-btn" data-view="appointments" id="nav-appointments">
+        <span class="nav-icon">📅</span> Turnos
+      </button>
+      <button class="nav-btn" data-view="new-appointment" id="nav-new">
+        <span class="nav-icon">➕</span> Nuevo Turno
+      </button>
+      <button class="nav-btn" data-view="availability" id="nav-availability">
+        <span class="nav-icon">🕐</span> Disponibilidad
+      </button>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="status-badge">
+        <span class="status-dot"></span> Sistema Activo
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── Main Content ── -->
+  <main class="main-content">
+    <!-- Header -->
+    <header class="top-header">
+      <button class="menu-toggle" id="menu-toggle">☰</button>
+      <div class="header-info">
+        <h2 class="header-title" id="page-title">Dashboard</h2>
+        <span class="header-date" id="header-date"></span>
+      </div>
+      <div class="header-actions">
+        <button class="btn btn-primary btn-glow" id="btn-refresh" title="Actualizar datos">
+          🔄 Actualizar
+        </button>
+      </div>
+    </header>
+
+    <!-- ── Vista: Dashboard ── -->
+    <section class="view active" id="view-dashboard">
+      <div class="stats-grid">
+        <div class="stat-card" id="stat-today">
+          <div class="stat-icon">📅</div>
+          <div class="stat-info">
+            <span class="stat-value" id="stat-today-count">-</span>
+            <span class="stat-label">Turnos Hoy</span>
+          </div>
+        </div>
+        <div class="stat-card" id="stat-confirmed">
+          <div class="stat-icon">✅</div>
+          <div class="stat-info">
+            <span class="stat-value" id="stat-confirmed-count">-</span>
+            <span class="stat-label">Confirmados</span>
+          </div>
+        </div>
+        <div class="stat-card" id="stat-available">
+          <div class="stat-icon">🕐</div>
+          <div class="stat-info">
+            <span class="stat-value" id="stat-available-count">-</span>
+            <span class="stat-label">Slots Libres</span>
+          </div>
+        </div>
+        <div class="stat-card" id="stat-channels">
+          <div class="stat-icon">💬</div>
+          <div class="stat-info">
+            <span class="stat-value" id="stat-channels-count">-</span>
+            <span class="stat-label">Canales Activos</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="dashboard-grid">
+        <div class="card">
+          <div class="card-header">
+            <h3>📋 Próximos Turnos</h3>
+          </div>
+          <div class="card-body" id="upcoming-list">
+            <div class="loading-spinner">Cargando...</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <h3>💬 Canales de Comunicación</h3>
+          </div>
+          <div class="card-body">
+            <div class="channels-list">
+              <div class="channel-item">
+                <span class="channel-icon whatsapp">📱</span>
+                <span class="channel-name">WhatsApp</span>
+                <span class="channel-status active">Conectado</span>
+              </div>
+              <div class="channel-item">
+                <span class="channel-icon instagram">📷</span>
+                <span class="channel-name">Instagram</span>
+                <span class="channel-status pending">Configurar</span>
+              </div>
+              <div class="channel-item">
+                <span class="channel-icon facebook">📘</span>
+                <span class="channel-name">Facebook</span>
+                <span class="channel-status pending">Configurar</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Vista: Turnos ── -->
+    <section class="view" id="view-appointments">
+      <div class="toolbar">
+        <div class="toolbar-filters">
+          <label class="filter-label">
+            📅 Fecha:
+            <input type="date" id="filter-date" class="input-field">
+          </label>
+          <label class="filter-label">
+            📌 Estado:
+            <select id="filter-status" class="input-field">
+              <option value="">Todos</option>
+              <option value="confirmed">Confirmados</option>
+              <option value="cancelled">Cancelados</option>
+              <option value="completed">Completados</option>
+            </select>
+          </label>
+        </div>
+        <button class="btn btn-primary" id="btn-filter-apply">Buscar</button>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <h3>📋 Lista de Turnos</h3>
+        </div>
+        <div class="card-body">
+          <div class="table-wrapper">
+            <table class="data-table" id="appointments-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Cliente</th>
+                  <th>Teléfono</th>
+                  <th>Canal</th>
+                  <th>Servicio</th>
+                  <th>Fecha</th>
+                  <th>Hora</th>
+                  <th>Estado</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="appointments-tbody">
+                <tr><td colspan="9" class="empty-state">Cargando turnos...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Vista: Nuevo Turno ── -->
+    <section class="view" id="view-new-appointment">
+      <div class="form-grid">
+        <div class="card">
+          <div class="card-header">
+            <h3>➕ Crear Nuevo Turno</h3>
+          </div>
+          <div class="card-body">
+            <form id="appointment-form">
+              <div class="form-group">
+                <label for="input-name">Nombre del Cliente</label>
+                <input type="text" id="input-name" class="input-field" placeholder="Ej: María García" required>
+              </div>
+              <div class="form-group">
+                <label for="input-phone">Teléfono (WhatsApp)</label>
+                <input type="tel" id="input-phone" class="input-field" placeholder="Ej: +5491112345678" required>
+              </div>
+              <div class="form-group">
+                <label for="input-channel">Canal de contacto</label>
+                <select id="input-channel" class="input-field">
+                  <option value="whatsapp">📱 WhatsApp</option>
+                  <option value="instagram">📷 Instagram</option>
+                  <option value="facebook">📘 Facebook</option>
+                  <option value="presencial">🏪 Presencial</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="input-service">Servicio</label>
+                <select id="input-service" class="input-field" required>
+                  <option value="">Seleccionar servicio...</option>
+                </select>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="input-date">Fecha</label>
+                  <input type="date" id="input-date" class="input-field" required>
+                </div>
+                <div class="form-group">
+                  <label for="input-time">Hora</label>
+                  <select id="input-time" class="input-field" required>
+                    <option value="">Elegí una fecha primero</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-actions">
+                <button type="submit" class="btn btn-primary btn-glow btn-lg" id="btn-submit-appointment">
+                  ✅ Confirmar Turno
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <h3>🕐 Horarios Disponibles</h3>
+          </div>
+          <div class="card-body" id="slots-preview">
+            <p class="empty-state">Seleccioná una fecha para ver disponibilidad</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Vista: Disponibilidad ── -->
+    <section class="view" id="view-availability">
+      <div class="toolbar">
+        <label class="filter-label">
+          📅 Fecha:
+          <input type="date" id="avail-date" class="input-field">
+        </label>
+        <button class="btn btn-primary" id="btn-check-avail">Ver Disponibilidad</button>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <h3>🗓️ Mapa de Disponibilidad</h3>
+        </div>
+        <div class="card-body">
+          <div id="availability-grid" class="availability-grid">
+            <p class="empty-state">Seleccioná una fecha para ver el mapa de horarios</p>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <h3>💈 Servicios Disponibles</h3>
+        </div>
+        <div class="card-body">
+          <div id="services-list" class="services-grid">
+            <div class="loading-spinner">Cargando servicios...</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Toast Notifications ── -->
+    <div class="toast-container" id="toast-container"></div>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

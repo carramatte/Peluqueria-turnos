@@ -1,0 +1,609 @@
+{
+    "name": "Peluquería - WhatsApp Turnos",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "whatsapp-webhook",
+                "responseMode": "responseNode",
+                "options": {}
+            },
+            "id": "webhook-trigger",
+            "name": "Webhook WhatsApp",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+                250,
+                300
+            ],
+            "webhookId": "whatsapp-webhook"
+        },
+        {
+            "parameters": {
+                "values": {
+                    "string": [
+                        {
+                            "name": "phone",
+                            "value": "={{ $json.body.from || $json.body.phone || '' }}"
+                        },
+                        {
+                            "name": "message",
+                            "value": "={{ ($json.body.message || $json.body.text || '').toLowerCase().trim() }}"
+                        },
+                        {
+                            "name": "clientName",
+                            "value": "={{ $json.body.name || $json.body.profile_name || 'Cliente' }}"
+                        },
+                        {
+                            "name": "channel",
+                            "value": "={{ $json.body.channel || 'whatsapp' }}"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "extract-data",
+            "name": "Extraer Datos del Mensaje",
+            "type": "n8n-nodes-base.set",
+            "typeVersion": 1,
+            "position": [
+                470,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "functionCode": "// Normalizar el mensaje del cliente\nconst message = items[0].json.message || '';\n\n// Detectar intención\nlet intent = 'unknown';\nlet requestedDate = '';\nlet requestedTime = '';\nlet requestedService = '';\n\n// Patrones para detectar intención\nconst availabilityPatterns = /\\b(disponib|horario|libre|huecos|cuando|turno|hay lugar|agenda)\\b/i;\nconst bookingPatterns = /\\b(reserv|quiero|necesito|pedir|agendar|sacar turno|anotame)\\b/i;\nconst cancelPatterns = /\\b(cancel|anular|eliminar|borrar|no puedo|no voy)\\b/i;\nconst greetingPatterns = /\\b(hola|buenas|buen dia|buenas tardes|buenas noches)\\b/i;\n\nif (cancelPatterns.test(message)) {\n  intent = 'cancel';\n} else if (bookingPatterns.test(message)) {\n  intent = 'book';\n} else if (availabilityPatterns.test(message)) {\n  intent = 'availability';\n} else if (greetingPatterns.test(message)) {\n  intent = 'greeting';\n}\n\n// Extraer fecha (mañana, pasado mañana, o formato DD/MM)\nconst today = new Date();\nif (/\\bma[ñn]ana\\b/i.test(message)) {\n  const tomorrow = new Date(today);\n  tomorrow.setDate(tomorrow.getDate() + 1);\n  requestedDate = tomorrow.toISOString().split('T')[0];\n} else if (/\\bpasado\\b/i.test(message)) {\n  const dayAfter = new Date(today);\n  dayAfter.setDate(dayAfter.getDate() + 2);\n  requestedDate = dayAfter.toISOString().split('T')[0];\n} else if (/\\bhoy\\b/i.test(message)) {\n  requestedDate = today.toISOString().split('T')[0];\n} else {\n  // Intentar extraer DD/MM o DD-MM\n  const dateMatch = message.match(/(\\d{1,2})[\\/-](\\d{1,2})/);\n  if (dateMatch) {\n    const day = dateMatch[1].padStart(2, '0');\n    const month = dateMatch[2].padStart(2, '0');\n    const year = today.getFullYear();\n    requestedDate = `${year}-${month}-${day}`;\n  }\n}\n\n// Extraer hora (10, 10:00, 10hs, 10:30, a las 14)\nconst timeMatch = message.match(/(\\d{1,2})(?::(\\d{2}))?\\s*(?:hs|hrs|horas|h)?/);\nif (timeMatch) {\n  const hours = timeMatch[1].padStart(2, '0');\n  const minutes = timeMatch[2] || '00';\n  requestedTime = `${hours}:${minutes}`;\n}\n\n// Extraer servicio\nconst servicePatterns = {\n  'Corte de cabello': /\\b(corte|cortarme|cortito)\\b/i,\n  'Corte + Barba': /\\b(barba|corte y barba|barba y corte)\\b/i,\n  'Tintura': /\\b(tintura|teñir|te[ñn]ido|color)\\b/i,\n  'Mechas': /\\b(mechas|reflejos|highlights)\\b/i,\n  'Brushing': /\\b(brushing|secado|peinado)\\b/i,\n  'Tratamiento capilar': /\\b(tratamiento|hidrataci[oó]n|keratina)\\b/i,\n  'Alisado': /\\b(alisado|lacio|alisar|plancha)\\b/i,\n  'Corte infantil': /\\b(ni[ñn]o|ni[ñn]a|infantil|chico|nene|nena)\\b/i\n};\n\nfor (const [service, pattern] of Object.entries(servicePatterns)) {\n  if (pattern.test(message)) {\n    requestedService = service;\n    break;\n  }\n}\n\n// Si no detectó servicio, usar \"Corte de cabello\" como default\nif (intent === 'book' && !requestedService) {\n  requestedService = 'Corte de cabello';\n}\n\nreturn [{\n  json: {\n    ...items[0].json,\n    intent,\n    requestedDate,\n    requestedTime,\n    requestedService\n  }\n}];"
+            },
+            "id": "parse-message",
+            "name": "Parsear Mensaje (NLP Básico)",
+            "type": "n8n-nodes-base.function",
+            "typeVersion": 1,
+            "position": [
+                690,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "dataType": "string",
+                "value1": "={{ $json.intent }}",
+                "rules": {
+                    "rules": [
+                        {
+                            "value2": "greeting",
+                            "operation": "equal",
+                            "output": 0
+                        },
+                        {
+                            "value2": "availability",
+                            "operation": "equal",
+                            "output": 1
+                        },
+                        {
+                            "value2": "book",
+                            "operation": "equal",
+                            "output": 2
+                        },
+                        {
+                            "value2": "cancel",
+                            "operation": "equal",
+                            "output": 3
+                        }
+                    ]
+                },
+                "fallbackOutput": 4
+            },
+            "id": "switch-intent",
+            "name": "Switch Intención",
+            "type": "n8n-nodes-base.switch",
+            "typeVersion": 1,
+            "position": [
+                910,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "values": {
+                    "string": [
+                        {
+                            "name": "responseMessage",
+                            "value": "¡Hola {{ $json.clientName }}! 👋✂️\n\nBienvenido/a a nuestra peluquería. ¿En qué te podemos ayudar?\n\n📅 *Consultar disponibilidad* — Escribí \"horarios\" + fecha\n📝 *Reservar turno* — Escribí \"quiero turno\" + fecha + hora\n❌ *Cancelar turno* — Escribí \"cancelar turno\"\n\nEjemplo: \"Quiero turno mañana a las 10 para corte\""
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "greeting-response",
+            "name": "Respuesta Saludo",
+            "type": "n8n-nodes-base.set",
+            "typeVersion": 1,
+            "position": [
+                1140,
+                100
+            ]
+        },
+        {
+            "parameters": {
+                "url": "http://backend:3000/api/availability",
+                "options": {
+                    "queryParameters": {
+                        "parameters": [
+                            {
+                                "name": "date",
+                                "value": "={{ $json.requestedDate }}"
+                            }
+                        ]
+                    }
+                }
+            },
+            "id": "check-availability",
+            "name": "Consultar Disponibilidad",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 3,
+            "position": [
+                1140,
+                260
+            ]
+        },
+        {
+            "parameters": {
+                "functionCode": "const data = items[0].json;\nconst availability = data.body || data;\nconst slots = availability.available_slots || [];\nconst date = availability.date || 'la fecha solicitada';\n\nlet responseMessage = '';\n\nif (slots.length === 0) {\n  responseMessage = `😔 Lo siento, no hay horarios disponibles para el ${date}.\\n\\n${availability.message || 'Probá con otra fecha.'}\\n\\n💡 Escribí \"horarios\" + otra fecha para consultar.`;\n} else {\n  const slotsList = slots.slice(0, 10).join(' | ');\n  const more = slots.length > 10 ? `\\n...y ${slots.length - 10} horarios más` : '';\n  responseMessage = `📅 *Horarios disponibles para ${date}:*\\n\\n🕐 ${slotsList}${more}\\n\\n✅ *${slots.length} horarios libres*\\n\\nPara reservar, escribí:\\n\"Quiero turno el ${date} a las [HORA] para [SERVICIO]\"\\n\\n💈 Servicios: Corte, Corte+Barba, Tintura, Mechas, Brushing, Alisado`;\n}\n\nreturn [{ json: { ...items[0].json, responseMessage } }];"
+            },
+            "id": "format-availability",
+            "name": "Formatear Disponibilidad",
+            "type": "n8n-nodes-base.function",
+            "typeVersion": 1,
+            "position": [
+                1360,
+                260
+            ]
+        },
+        {
+            "parameters": {
+                "url": "http://backend:3000/api/appointments",
+                "method": "POST",
+                "bodyParameters": {
+                    "parameters": [
+                        {
+                            "name": "client_name",
+                            "value": "={{ $json.clientName }}"
+                        },
+                        {
+                            "name": "client_phone",
+                            "value": "={{ $json.phone }}"
+                        },
+                        {
+                            "name": "client_channel",
+                            "value": "={{ $json.channel }}"
+                        },
+                        {
+                            "name": "service",
+                            "value": "={{ $json.requestedService }}"
+                        },
+                        {
+                            "name": "date",
+                            "value": "={{ $json.requestedDate }}"
+                        },
+                        {
+                            "name": "time",
+                            "value": "={{ $json.requestedTime }}"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "create-appointment",
+            "name": "Crear Turno",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 3,
+            "position": [
+                1140,
+                420
+            ]
+        },
+        {
+            "parameters": {
+                "functionCode": "const data = items[0].json;\nconst body = data.body || data;\nlet responseMessage = '';\n\nif (body.success) {\n  const apt = body.data;\n  responseMessage = `✅ *¡Turno confirmado!*\\n\\n👤 Cliente: ${apt.client_name}\\n✂️ Servicio: ${apt.service}\\n📅 Fecha: ${apt.date}\\n🕐 Hora: ${apt.time}\\n⏱ Duración: ${apt.duration_min} min\\n\\n📲 Te enviaremos un recordatorio 15 minutos antes.\\n\\n¡Te esperamos! 💇`;\n} else {\n  responseMessage = `❌ No pudimos reservar tu turno.\\n\\n${body.error || 'Ese horario ya no está disponible.'}\\n\\n💡 Escribí \"horarios\" + fecha para ver opciones disponibles.`;\n}\n\nreturn [{ json: { ...items[0].json, responseMessage } }];"
+            },
+            "id": "format-booking",
+            "name": "Formatear Confirmación",
+            "type": "n8n-nodes-base.function",
+            "typeVersion": 1,
+            "position": [
+                1360,
+                420
+            ]
+        },
+        {
+            "parameters": {
+                "values": {
+                    "string": [
+                        {
+                            "name": "responseMessage",
+                            "value": "Para cancelar tu turno, necesitamos tu número de turno. 📋\n\nSi no lo tenés, contactanos directamente y te ayudamos.\n\n📞 También podés cancelar desde nuestro sitio web."
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "cancel-response",
+            "name": "Respuesta Cancelación",
+            "type": "n8n-nodes-base.set",
+            "typeVersion": 1,
+            "position": [
+                1140,
+                580
+            ]
+        },
+        {
+            "parameters": {
+                "values": {
+                    "string": [
+                        {
+                            "name": "responseMessage",
+                            "value": "🤔 No entendí tu mensaje. Te cuento cómo puedo ayudarte:\n\n📅 *Ver horarios* → \"horarios mañana\"\n📝 *Reservar* → \"quiero turno mañana a las 10 para corte\"\n❌ *Cancelar* → \"cancelar turno\"\n\n💡 Probá escribir alguno de estos mensajes."
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "unknown-response",
+            "name": "Mensaje No Entendido",
+            "type": "n8n-nodes-base.set",
+            "typeVersion": 1,
+            "position": [
+                1140,
+                740
+            ]
+        },
+        {
+            "parameters": {
+                "respondWith": "text",
+                "responseBody": "={{ $json.responseMessage }}",
+                "options": {}
+            },
+            "id": "send-response",
+            "name": "Enviar Respuesta WhatsApp",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1,
+            "position": [
+                1600,
+                420
+            ]
+        },
+        {
+            "parameters": {
+                "rule": {
+                    "interval": [
+                        {
+                            "field": "minutes",
+                            "minutesInterval": 5
+                        }
+                    ]
+                }
+            },
+            "id": "cron-reminders",
+            "name": "Cron: Cada 5 minutos",
+            "type": "n8n-nodes-base.cron",
+            "typeVersion": 1,
+            "position": [
+                250,
+                900
+            ]
+        },
+        {
+            "parameters": {
+                "url": "http://backend:3000/api/appointments/pending-reminders",
+                "options": {}
+            },
+            "id": "get-pending",
+            "name": "Buscar Turnos Próximos",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 3,
+            "position": [
+                470,
+                900
+            ]
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "number": [
+                        {
+                            "value1": "={{ $json.data ? $json.data.length : 0 }}",
+                            "operation": "larger",
+                            "value2": 0
+                        }
+                    ]
+                }
+            },
+            "id": "check-has-reminders",
+            "name": "¿Hay turnos próximos?",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 1,
+            "position": [
+                690,
+                900
+            ]
+        },
+        {
+            "parameters": {
+                "fieldToSplitOut": "data",
+                "options": {}
+            },
+            "id": "split-reminders",
+            "name": "Separar por Turno",
+            "type": "n8n-nodes-base.splitOut",
+            "typeVersion": 1,
+            "position": [
+                910,
+                860
+            ]
+        },
+        {
+            "parameters": {
+                "values": {
+                    "string": [
+                        {
+                            "name": "reminderMessage",
+                            "value": "⏰ *Recordatorio de turno*\n\n¡Hola {{ $json.client_name }}!\n\nTu turno es en 15 minutos:\n\n✂️ {{ $json.service }}\n🕐 {{ $json.time }}\n📅 {{ $json.date }}\n\n¡Te esperamos! 💇"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "format-reminder",
+            "name": "Formatear Recordatorio",
+            "type": "n8n-nodes-base.set",
+            "typeVersion": 1,
+            "position": [
+                1140,
+                860
+            ]
+        },
+        {
+            "parameters": {
+                "url": "=http://backend:3000/api/appointments/{{ $json.id }}/reminder-sent",
+                "method": "PUT",
+                "options": {}
+            },
+            "id": "mark-sent",
+            "name": "Marcar Recordatorio Enviado",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 3,
+            "position": [
+                1360,
+                860
+            ]
+        },
+        {
+            "parameters": {},
+            "id": "no-reminders",
+            "name": "Sin Recordatorios",
+            "type": "n8n-nodes-base.noOp",
+            "typeVersion": 1,
+            "position": [
+                910,
+                960
+            ]
+        }
+    ],
+    "connections": {
+        "Webhook WhatsApp": {
+            "main": [
+                [
+                    {
+                        "node": "Extraer Datos del Mensaje",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Extraer Datos del Mensaje": {
+            "main": [
+                [
+                    {
+                        "node": "Parsear Mensaje (NLP Básico)",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Parsear Mensaje (NLP Básico)": {
+            "main": [
+                [
+                    {
+                        "node": "Switch Intención",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Switch Intención": {
+            "main": [
+                [
+                    {
+                        "node": "Respuesta Saludo",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Consultar Disponibilidad",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Crear Turno",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Respuesta Cancelación",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Mensaje No Entendido",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Respuesta Saludo": {
+            "main": [
+                [
+                    {
+                        "node": "Enviar Respuesta WhatsApp",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Consultar Disponibilidad": {
+            "main": [
+                [
+                    {
+                        "node": "Formatear Disponibilidad",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Formatear Disponibilidad": {
+            "main": [
+                [
+                    {
+                        "node": "Enviar Respuesta WhatsApp",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Crear Turno": {
+            "main": [
+                [
+                    {
+                        "node": "Formatear Confirmación",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Formatear Confirmación": {
+            "main": [
+                [
+                    {
+                        "node": "Enviar Respuesta WhatsApp",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Respuesta Cancelación": {
+            "main": [
+                [
+                    {
+                        "node": "Enviar Respuesta WhatsApp",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Mensaje No Entendido": {
+            "main": [
+                [
+                    {
+                        "node": "Enviar Respuesta WhatsApp",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Cron: Cada 5 minutos": {
+            "main": [
+                [
+                    {
+                        "node": "Buscar Turnos Próximos",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Buscar Turnos Próximos": {
+            "main": [
+                [
+                    {
+                        "node": "¿Hay turnos próximos?",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "¿Hay turnos próximos?": {
+            "main": [
+                [
+                    {
+                        "node": "Separar por Turno",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Sin Recordatorios",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Separar por Turno": {
+            "main": [
+                [
+                    {
+                        "node": "Formatear Recordatorio",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Formatear Recordatorio": {
+            "main": [
+                [
+                    {
+                        "node": "Marcar Recordatorio Enviado",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "timezone": "America/Argentina/Buenos_Aires"
+    }
+}
