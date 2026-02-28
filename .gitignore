@@ -1,25 +1,9 @@
-# Dependencies
 node_modules/
-
-# Environment files
 .env
-.env.local
-
-# OS files
+dist/
+build/
 .DS_Store
-Thumbs.db
-desktop.ini
-
-# IDE
-.vscode/
-.idea/
-
-# Logs
-*.log
-npm-debug.log*
-
-# Docker volumes data
-n8n/data/
-
-# SQLite database (generated at runtime)
+npm-debug.log
+yarn-error.log
+backend/data/*.sqlite
 backend/data/*.db
